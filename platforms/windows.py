@@ -1,9 +1,9 @@
 import os
-from .. import BuildPlatform, ArchType, PlatformType
+from io import StringIO
+from .. import BuildPlatform, ArchType, PlatformType, compile_sources, copy_binaries
 from ..deps import Python, LibZip, ZLib
-from ..utils.png2ico import ICOParser 
-from ..packages import AppPackage, BootstrapPackage
-
+from ..packages import App, Bootstrap
+from ..utils.png2ico import ICOParser
 
 class WindowsBuild(BuildPlatform):
     def __init__(
@@ -37,13 +37,88 @@ class WindowsBuild(BuildPlatform):
 
 
     def __unpack_dependicies__(self):
-        print(f" Checking missing dependicies...")
+        print(" Checking missing dependicies...")
         Python(self.platform, self.py_version).unpack()
         LibZip(self.platform).unpack()
         ZLib(self.platform).unpack()
 
 
     def __package__(self):
-        print(f" Cooking python scripts...")
-        AppPackage(self.arch).package()
-        BootstrapPackage(self.platform, self.arch, self.py_version).package()
+        print(" Cooking python scripts...")
+
+        app_size = 0
+        bootstrap_size = 0
+        
+        src_path = os.path.join(os.getcwd(), "src")
+        out_path = os.path.join(os.getcwd(), "build", "intermediate", "app")
+        cache_path = os.path.join(out_path, ".sources")
+        
+        out_cache = StringIO()
+        if os.path.exists(cache_path):
+            result = compile_sources(src_path, out_path, cache_path, out_cache)
+        else:
+            result = compile_sources(src_path, out_path, None, out_cache)
+
+        if result is not None:
+            with open(cache_path, "wt") as fp:
+                fp.write(out_cache.getvalue())
+            app_size += result
+        else:
+            print(" Cooking python scripts ended with error")
+            return
+
+        src_path = os.path.join(os.path.dirname(__file__), PlatformType.name(self.platform))
+        out_path = os.path.join(os.getcwd(), "build", "intermediate", "bootstrap")
+        cache_path = os.path.join(out_path, ".sources")
+
+        out_cache = StringIO()
+        if os.path.exists(cache_path):
+            result = compile_sources(src_path, out_path, cache_path, out_cache)
+        else:
+            result = compile_sources(src_path, out_path, None, out_cache)
+
+        if result is not None:
+            with open(cache_path, "wt") as fp:
+                fp.write(out_cache.getvalue())
+            bootstrap_size += result
+        else:
+            print(" Cooking python scripts ended with error")
+            return
+        
+        print(" Copy binaries...")
+        
+        src_path = os.path.join(os.getcwd(), "lib", ArchType.name(self.arch))
+        out_path = os.path.join(os.getcwd(), "build", "intermediate", "app")
+        cache_path = os.path.join(out_path, ".binaries")
+
+        out_cache = StringIO()
+        if os.path.exists(cache_path):
+            result = copy_binaries(src_path, out_path, cache_path, out_cache)
+        else:
+            result = copy_binaries(src_path, out_path, None, out_cache)
+
+        if result > 0:
+            with open(cache_path, "wt") as fp:
+                fp.write(out_cache.getvalue())
+            app_size += result
+
+        src_path = os.path.join(os.getcwd(), "build", "intermediate", "deps", f"python-{self.py_version}", "bin", ArchType.name(self.arch))
+        out_path = os.path.join(os.getcwd(), "build", "intermediate", "bootstrap")
+        cache_path = os.path.join(out_path, ".binaries")
+
+        out_cache = StringIO()
+        if os.path.exists(cache_path):
+            result = copy_binaries(src_path, out_path, cache_path, out_cache)
+        else:
+            result = copy_binaries(src_path, out_path, None, out_cache)
+
+        if result > 0:
+            with open(cache_path, "wt") as fp:
+                fp.write(out_cache.getvalue())
+            bootstrap_size += result
+
+        print(" Packing archives...")
+        if app_size > 0:
+            App().package()
+        if bootstrap_size > 0:
+            Bootstrap().package()
