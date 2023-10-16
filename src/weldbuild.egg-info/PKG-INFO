@@ -1,4 +1,19 @@
-![splash](https://github.com/a3st/weldbuild/raw/main/splash.png)
+Metadata-Version: 2.1
+Name: weldbuild
+Version: 1.0.0
+Summary: Lightweight deployment tool for Python
+Author-email: Dmitriy Lukovenko <mludima23@gmail.com>
+Project-URL: Homepage, https://github.com/a3st/weldbuild
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: Android
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX :: Linux
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+
+![splash](splash.png)
 
 ### Features
 

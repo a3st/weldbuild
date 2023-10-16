@@ -1,0 +1,16 @@
+LICENSE.txt
+README.md
+pyproject.toml
+src/weldbuild/__init__.py
+src/weldbuild/deps.py
+src/weldbuild.egg-info/PKG-INFO
+src/weldbuild.egg-info/SOURCES.txt
+src/weldbuild.egg-info/dependency_links.txt
+src/weldbuild.egg-info/top_level.txt
+src/weldbuild/platforms/__init__.py
+src/weldbuild/platforms/android.py
+src/weldbuild/platforms/windows.py
+src/weldbuild/platforms/win32/python/src/_boot.py
+src/weldbuild/utils/png2ico.py
+src/weldbuild/utils/cmake/__init__.py
+src/weldbuild/utils/gradle/__init__.py
