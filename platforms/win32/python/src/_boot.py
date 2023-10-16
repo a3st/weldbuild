@@ -7,7 +7,7 @@ import sys
 
 try:
     # Find DLL modules, should be always not None
-    app_path = next((i for i in sys.path if os.path.basename(i) == ".app"), None)
+    app_path = next((i for i in sys.path if os.path.relpath(i, ".app") == "modules"), None)
     os.add_dll_directory(app_path)
 
     # Run Application

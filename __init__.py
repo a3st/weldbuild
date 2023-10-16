@@ -1,8 +1,10 @@
 import zipfile
 import os
 import shutil
-from io import StringIO
 import py_compile
+import datetime
+
+Version = tuple[int, int, int]
 
 class ArchType:
     ARM64 = 0
@@ -46,6 +48,24 @@ class BuildPlatform:
     def configure(self, arch: ArchType):
         self.arch = arch
 
+        clean = True
+
+        if os.path.exists(os.path.join(os.getcwd(), "build", "intermediate", ".configure")):
+            with open(os.path.join(os.getcwd(), "build", "intermediate", ".configure"), "rt") as fp:
+                data = fp.read()
+                _, value = data.split('=')
+                
+                if value == ArchType.name(arch):
+                    clean = False
+
+        if clean:
+            shutil.rmtree(os.path.join(os.getcwd(), "build"), ignore_errors=True)
+
+            os.makedirs(os.path.join(os.getcwd(), "build", "intermediate"), exist_ok=True)
+
+            with open(os.path.join(os.getcwd(), "build", "intermediate", ".configure"), "wt") as fp:
+                fp.write(f"ARCH={ArchType.name(arch)}")
+
     
     def build(self):
         pass
@@ -62,76 +82,62 @@ class Library:
         self.platform = platform
         self.version = version
 
-        deps_path = os.path.join(os.getcwd(), "build", "intermediate", "deps")
-        os.makedirs(deps_path, exist_ok=True)
+        self.out_path = os.path.join(os.getcwd(), "build", "intermediate", "deps")
+        os.makedirs(self.out_path, exist_ok=True)
         
+
+    def path(self) -> str:
+        return f"{self.name}-{self.version}"
+    
         
     def unpack(self):
-        if os.path.exists(os.path.join(os.getcwd(), "build", "intermediate", "deps", f"{self.name}-{self.version}")):
+        if os.path.exists(os.path.join(self.out_path, self.path())):
             return
 
-        print(f" Unpack {self.name}-{self.version}-{PlatformType.name(self.platform)}.zip")
+        print(f" Unpack {self.path()}-{PlatformType.name(self.platform)}.zip")
 
-        with zipfile.ZipFile(os.path.join(os.path.dirname(__file__), "deps", f"{self.name}-{self.version}-{PlatformType.name(self.platform)}.zip"), "r") as zipfp:
-            zipfp.extractall(os.path.join(os.getcwd(), "build", "intermediate", "deps", f"{self.name}-{self.version}"))
-
-
-class Package:
-    def __init__(
-        self,
-        src_path: str,
-        output_path: str
-    ):
-        self.src_path = src_path
-        self.output_path = output_path
-
-        
-    def package(self):
-        os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
-
-        print(f" Pack {self.src_path}")
-
-        with zipfile.ZipFile(os.path.join(self.output_path), "w", zipfile.ZIP_STORED) as zipfp:
-            with open(os.path.join(self.src_path, ".sources"), "rt") as fp:
-                while True:
-                    line = fp.readline().strip('\n')
-            
-                    if line == None or line == '':
-                        break
-
-                    data = line.split(',')
-
-                    file_path = data[0]
-
-                    zipfp.write(os.path.join(self.src_path, file_path.removesuffix(".py") + ".pyc"), os.path.relpath(file_path, self.src_path))
-            
-            with open(os.path.join(self.src_path, ".binaries"), "rt") as fp:
-                while True:
-                    line = fp.readline().strip('\n')
-            
-                    if line == None or line == '':
-                        break
-
-                    data = line.split(',')
-
-                    file_path = data[0]
-
-                    if file_path.endswith('.so') or file_path.endswith('.pyd') or file_path.endswith('.dll'):
-                        arc_name = os.path.join("modules", os.path.basename(file_path))
-                    else:
-                        arc_name = os.path.relpath(file_path, self.src_path)
-                    zipfp.write(os.path.join(self.src_path, file_path), arc_name)
+        with zipfile.ZipFile(os.path.join(os.path.dirname(__file__), "deps", f"{self.path()}-{PlatformType.name(self.platform)}.zip"), "r") as zipfp:
+            zipfp.extractall(os.path.join(self.out_path, self.path()))
 
 
-def compile_sources(src_path: str, out_path: str, cache_path: str, out_cache: StringIO) -> int | bool:
-    os.makedirs(out_path, exist_ok=True)
+def archive_package(src_path: str, version: Version, output_path: str) -> str:
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    count = 0
+    print(f" Pack {src_path}")
 
-    def get_sources_using_cache_file() -> list[str]:
+    # Calculate version and build timestamp
+    version_string = ".".join(map(str, version))
+    version_timestamp = str(datetime.datetime.now().timestamp().as_integer_ratio()[1])
+
+    # Create .VERSION file - VERSION_STRING.VERSION_TIMESTAMP
+    with open(os.path.join(src_path, ".VERSION"), "wt") as fp:
+        fp.write(f"{version_string}.{version_timestamp}")
+    
+    # Create ZIP archive
+    with zipfile.ZipFile(os.path.join(output_path), "w", zipfile.ZIP_STORED) as zipfp:
+        for path, _, files in os.walk(src_path):
+            for file in files:
+                zipfp.write(os.path.join(path, file), os.path.relpath(os.path.join(path, file), src_path))
+
+    return f"{version_string}.{version_timestamp}"
+
+
+def copy_compile(src_path: str, out_path: str) -> int:
+    def get_sources() -> list[str]:
         out = []
 
-        with open(os.path.join(out_path, ".sources"), "rt") as fp:
+        for path, _, files in os.walk(src_path):
+            for file in files:
+                if file.endswith('.py') or file.endswith('.dll') or file.endswith('.so') or \
+                    file.endswith('.zip') or file.endswith('.') or file.endswith('.pyd') or file.endswith('.exe'):
+                    out.append(os.path.join(path, file))
+        return out
+    
+
+    def get_database() -> dict:
+        out = {}
+
+        with open(os.path.join(os.getcwd(), "build", "intermediate", ".sources"), "rt") as fp:
             while True:
                 line = fp.readline().strip('\n')
             
@@ -144,116 +150,79 @@ def compile_sources(src_path: str, out_path: str, cache_path: str, out_cache: St
                 file_size = int(data[1])
                 file_mtime = float(data[2])
 
-                if file_path.endswith('.py'):
-                    scan_size = os.path.getsize(os.path.join(src_path, file_path))
-                    scan_mtime = os.path.getmtime(os.path.join(src_path, file_path))
-
-                    if file_size != scan_size and file_mtime != scan_mtime:
-                        out.append(file_path)
+                out[file_path] = (file_size, file_mtime)
         return out
 
-    def get_sources_without_cache_file() -> list[str]:
+
+    def filter_sources(sources: list[str], database: dict) -> list[str]:
         out = []
 
-        for path, _, files in os.walk(src_path):
-            for file in files:
-                if file.endswith('.py'):
-                    out.append(os.path.relpath(os.path.join(path, file), src_path))
+        for source in sources:
+            value = database.get(source)
+
+            scan_size = os.path.getsize(source)
+            scan_mtime = os.path.getmtime(source)
+
+            if value is not None:
+                if value[0] != scan_size and value[1] != scan_mtime:
+                    out.append(source)
+            else:
+                database[source] = (scan_size, scan_mtime)
+                out.append(source)
         return out
+    
+    
+    def save_database_to_file(database: dict):
+        with open(os.path.join(os.getcwd(), "build", "intermediate", ".sources"), 'wt') as fp:
+            for key, value in database.items():
+                fp.write(f"{key},{value[0]},{value[1]}\n")
 
-    if cache_path:
-        sources = get_sources_using_cache_file()
+    os.makedirs(out_path, exist_ok=True)
+    size = 0
+
+    # First, we are need get sources files
+    sources = get_sources()
+
+    # If out_path already has .sources - text file
+    if os.path.exists(os.path.join(os.getcwd(), "build", "intermediate", ".sources")):
+        # Get database from .sources - text file
+        database = get_database()
     else:
-        sources = get_sources_without_cache_file()
+        database = {}
+    # We are need filter it for speed optimizations
+    sources = filter_sources(sources, database)
 
-    result = True
+    os.makedirs(os.path.join(out_path, "modules"), exist_ok=True)
+
+    # Iterate over sources. If it is .py - compile, .etc - copy as binary file
     for source in sources:
         if source.endswith(".py"):
             try:
-                print(f" Build {os.path.join(src_path, source)}")
+                print(f" Build {source}")
                 py_compile.compile(
-                    os.path.join(src_path, source), 
-                    os.path.join(out_path, source.removesuffix(".py") + ".pyc"), 
+                    source, 
+                    os.path.join(out_path, os.path.relpath(source.removesuffix(".py") + ".pyc", src_path)), 
                     doraise=True, 
                     quiet=1
                 )
-                count += 1
+                size += 1
             except py_compile.PyCompileError as e:
-                print(f" Build failed!\n{e}")
-                result = False
-                break
+                raise RuntimeError(f" Build failed!\n{e}")
+        else:
+            print(f" Copy {source}")
+            if source.endswith(".so") or source.endswith(".pyd") or source.endswith(".dll"):
+                # Windows and Linux solution. Interp needs .so or .dll for launch
+                if os.path.basename(source) == "python311.dll" or os.path.basename(source) == "python3.11.so":
+                    shutil.copyfile(source, os.path.join(out_path, os.path.basename(source)))
+                # Python libraries are locates in modules dir
+                else:
+                    shutil.copyfile(source, os.path.join(out_path, "modules", os.path.basename(source)))
+            # Etc binaries are locates in root folder
+            else:
+                shutil.copyfile(source, os.path.join(out_path, os.path.basename(source)))
+            size += 1
 
-    if result:
-        for path, _, files in os.walk(src_path):
-            for file in files:
-                if file.endswith('.py'):
-                    file_path = os.path.relpath(os.path.join(path, file), src_path)
-                    file_size = os.path.getsize(os.path.join(path, file))
-                    file_mtime = os.path.getmtime(os.path.join(path, file))
-
-                    out_cache.write(f"{file_path},{file_size},{file_mtime}\n")
-        return count
-    else:
-        return result
-
-
-def copy_binaries(src_path: str, out_path: str, cache_path: str, out_cache: StringIO) -> int:
-    os.makedirs(out_path, exist_ok=True)
-
-    count = 0
-
-    def get_binaries_using_cache_file() -> list[str]:
-        out = []
-
-        with open(os.path.join(out_path, ".binaries"), "rt") as fp:
-            while True:
-                line = fp.readline().strip('\n')
-            
-                if line == None or line == '':
-                    break
-
-                data = line.split(',')
-
-                file_path = data[0]
-                file_size = int(data[1])
-                file_mtime = float(data[2])
-
-                if not (file_path.endswith('.py') or file_path.endswith('.pyi') or file_path.endswith('.pyc')):
-                    scan_size = os.path.getsize(os.path.join(src_path, file_path))
-                    scan_mtime = os.path.getmtime(os.path.join(src_path, file_path))
-
-                    if file_size != scan_size and file_mtime != scan_mtime:
-                        out.append(file_path)
-        return out
-
-    def get_binaries_without_cache_file() -> list[str]:
-        out = []
-
-        for path, _, files in os.walk(src_path):
-            for file in files:
-                if not (file.endswith('.py') or file.endswith('.pyi') or file.endswith('.pyc')):
-                    out.append(os.path.relpath(os.path.join(path, file), src_path))
-        return out
-
-    if cache_path:
-        binaries = get_binaries_using_cache_file()
-    else:
-        binaries = get_binaries_without_cache_file()
-
-    for binary in binaries:
-        if not (binary.endswith('.py') or binary.endswith('.pyi') or binary.endswith('.pyc')):
-            os.makedirs(os.path.dirname(os.path.join(out_path, binary)), exist_ok=True)
-            shutil.copyfile(os.path.join(src_path, binary), os.path.join(out_path, binary))
-            print(f" Copy {os.path.join(src_path, binary)}")
-            count += 1
-
-    for path, _, files in os.walk(src_path):
-        for file in files:
-            if not (file.endswith('.py') or file.endswith('.pyi') or file.endswith('.pyc')):
-                file_path = os.path.relpath(os.path.join(path, file), src_path)
-                file_size = os.path.getsize(os.path.join(path, file))
-                file_mtime = os.path.getmtime(os.path.join(path, file))
-
-                out_cache.write(f"{file_path},{file_size},{file_mtime}\n")
-
-    return count
+    # Rewrite database if files has been changed
+    if size > 0:
+        save_database_to_file(database)
+    return size

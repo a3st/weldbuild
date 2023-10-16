@@ -1,0 +1,4 @@
+#include "appres.h"
+
+IDI_ICON ICON "../resources/app.ico"
+IDB_APP RCDATA "../resources/app.zip"
