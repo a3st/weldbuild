@@ -40,6 +40,8 @@
     project.build()
 ```
 
+[Example project](https://github.com/a3st/weldbuild_example_project)
+
 ### Documention
 
 Not ready yet...
