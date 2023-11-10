@@ -19,7 +19,11 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-weldbuild = ["deps/*"]
+weldbuild = [
+    "deps/*", 
+    "platforms/win32/*", 
+    "platforms/android/*"
+]
 
 [project.urls]
 Source = "https://github.com/a3st/weldbuild"

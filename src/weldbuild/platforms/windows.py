@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import json
+import site
 from .. import BuildPlatform, ArchType, PlatformType, Version, archive_package, copy_compile
 from ..deps import Python, LibZip, ZLib
 from ..utils.png2ico import ICOParser
@@ -111,10 +112,10 @@ class WindowsBuild(BuildPlatform):
         archive_size = 0
         
         src_path = os.path.join(os.getcwd(), "src")
-        out_path = os.path.join(os.getcwd(), "build", "intermediate", "app")
+        out_path = os.path.join(os.getcwd(), "build", "intermediate", "app", "site-packages")
         
         try:
-            size = copy_compile(src_path, out_path)
+            size = copy_compile(src_path, out_path, "__app__")
             archive_size += size
         except RuntimeError as e:
             print(e)
@@ -129,14 +130,23 @@ class WindowsBuild(BuildPlatform):
         except RuntimeError as e:
             print(e)
             return
+
+        for package in self.site_packages:
+            if not os.path.exists(os.path.join(site.getusersitepackages(), package)):
+                print(f"Error: Can't find package '{package}'")
+                return 
+            
+            src_path = os.path.join(site.getusersitepackages(), package)
+            out_path = os.path.join(os.getcwd(), "build", "intermediate", "app", "site-packages")
+            
+            try:
+                size = copy_compile(src_path, out_path, package)
+                archive_size += size
+            except RuntimeError as e:
+                print(e)
+                return
         
         print(" Copy binaries...")
-        
-        src_path = os.path.join(os.getcwd(), "lib", ArchType.name(self.arch))
-        out_path = os.path.join(os.getcwd(), "build", "intermediate", "app")
-
-        size = copy_compile(src_path, out_path)
-        archive_size += size
 
         src_path = os.path.join(os.getcwd(), "build", "intermediate", "deps", f"python-{self.py_version}", "bin", ArchType.name(self.arch))
         out_path = os.path.join(os.getcwd(), "build", "intermediate", "app")

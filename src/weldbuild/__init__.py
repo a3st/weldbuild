@@ -43,6 +43,7 @@ class BuildPlatform:
     def __init__(self, platform: PlatformType):
         self.platform = platform
         self.arch = None
+        self.site_packages = []
 
 
     def configure(self, arch: ArchType):
@@ -65,6 +66,10 @@ class BuildPlatform:
 
             with open(os.path.join(os.getcwd(), "build", "intermediate", ".configure"), "wt") as fp:
                 fp.write(f"ARCH={ArchType.name(arch)}")
+
+    
+    def add_site_packages(self, packages: list[str]):
+        self.site_packages.extend(packages)
 
     
     def build(self):
@@ -122,14 +127,13 @@ def archive_package(src_path: str, version: Version, output_path: str) -> str:
     return f"{version_string}.{version_timestamp}"
 
 
-def copy_compile(src_path: str, out_path: str) -> int:
+def copy_compile(src_path: str, out_path: str, dir_name: str = '') -> int:
     def get_sources() -> list[str]:
         out = []
 
         for path, _, files in os.walk(src_path):
             for file in files:
-                if file.endswith('.py') or file.endswith('.dll') or file.endswith('.so') or \
-                    file.endswith('.zip') or file.endswith('.') or file.endswith('.pyd') or file.endswith('.exe'):
+                if not file.endswith(".pyc"):
                     out.append(os.path.join(path, file))
         return out
     
@@ -192,16 +196,14 @@ def copy_compile(src_path: str, out_path: str) -> int:
     # We are need filter it for speed optimizations
     sources = filter_sources(sources, database)
 
-    os.makedirs(os.path.join(out_path, "modules"), exist_ok=True)
-
     # Iterate over sources. If it is .py - compile, .etc - copy as binary file
     for source in sources:
         if source.endswith(".py"):
             try:
-                print(f" Build {source}")
+                print(f" Build {source}") 
                 py_compile.compile(
                     source, 
-                    os.path.join(out_path, os.path.relpath(source.removesuffix(".py") + ".pyc", src_path)), 
+                    os.path.join(out_path, dir_name, os.path.relpath(source.removesuffix(".py") + ".pyc", src_path)), 
                     doraise=True, 
                     quiet=1
                 )
@@ -210,16 +212,8 @@ def copy_compile(src_path: str, out_path: str) -> int:
                 raise RuntimeError(f" Build failed!\n{e}")
         else:
             print(f" Copy {source}")
-            if source.endswith(".so") or source.endswith(".pyd") or source.endswith(".dll"):
-                # Windows and Linux solution. Interp needs .so or .dll for launch
-                if os.path.basename(source) == "python311.dll" or os.path.basename(source) == "python3.11.so":
-                    shutil.copyfile(source, os.path.join(out_path, os.path.basename(source)))
-                # Python libraries are locates in modules dir
-                else:
-                    shutil.copyfile(source, os.path.join(out_path, "modules", os.path.basename(source)))
-            # Etc binaries are locates in root folder
-            else:
-                shutil.copyfile(source, os.path.join(out_path, os.path.basename(source)))
+            os.makedirs(os.path.dirname(os.path.join(out_path, dir_name, os.path.relpath(source, src_path))), exist_ok=True)
+            shutil.copyfile(source, os.path.join(out_path, dir_name, os.path.relpath(source, src_path)))
             size += 1
 
     # Rewrite database if files has been changed

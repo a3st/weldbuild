@@ -27,7 +27,7 @@ auto zip_unpack_from_buffer(std::span<uint8_t> const buffer, std::filesystem::pa
                 }
 
                 if(!std::filesystem::exists(out_path / std::filesystem::path(stat.name).parent_path())) {
-                    std::filesystem::create_directory(out_path / std::filesystem::path(stat.name).parent_path());
+                    std::filesystem::create_directories(out_path / std::filesystem::path(stat.name).parent_path());
                 }
 
                 std::fstream fs(out_path / stat.name, std::ios::out | std::ios::binary);
