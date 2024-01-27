@@ -1,12 +1,12 @@
 ![splash](https://github.com/a3st/weldbuild/raw/main/splash.png)
 
-### Features
+## Features
 
 * Popular platforms deployment: Windows, Linux, Android
 * Project configuration is simple: One build.py
 * Precompiled libraries out of the box: Windows (x64, x86), Linux (x64, x86), Android (armeabi-v7a, arm64-v8a)
 
-### Requirements
+## Requirements
 
 1. Android deployment
     * Android SDK
@@ -17,7 +17,7 @@
 3. Linux deployment
     * CMake
 
-### Example
+## Example
 
 ```python
     from weldbuild import ArchType
@@ -42,10 +42,14 @@
 
 [Example project](https://github.com/a3st/weldbuild_example_project)
 
-### Documention
+## Roadmap
 
-Not ready yet...
+- Deployments
+  - [x] Windows
+  - [ ] Linux
+  - [ ] Android
+- [ ] Custom pre-post build commands
 
-### License
+## License
 
 Check LICENSE for additional information.
