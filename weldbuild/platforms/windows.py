@@ -102,7 +102,7 @@ class WindowsBuild(BuildPlatform):
             )
 
             os.makedirs(os.path.join(os.getcwd(), "dist"), exist_ok=True)
-            
+
             shutil.copyfile(
                 os.path.join(
                     os.getcwd(), "build", "generated", "build", "Release", "main.exe"
@@ -110,9 +110,7 @@ class WindowsBuild(BuildPlatform):
                 os.path.join(os.getcwd(), "dist", "main.exe"),
             )
 
-            print(
-                f" Out: {os.path.join(os.getcwd(), "dist", "main.exe")}"
-            )
+            print(f" Out: {os.path.join(os.getcwd(), 'dist', 'main.exe')}")
 
         except FileNotFoundError as e:
             print("Error: VsDevCmd.bat not found")
