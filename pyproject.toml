@@ -1,6 +1,6 @@
 [project]
 name = "weldbuild"
-version = "1.0.1"
+version = "1.0.3"
 authors = [
     { name = "Dmitriy Lukovenko", email = "mludima23@gmail.com" }
 ]
@@ -18,12 +18,18 @@ dependencies = [
     "Pillow"
 ]
 
+[tool.setuptools.packages.find]
+where = [""]
+
 [tool.setuptools.package-data]
 weldbuild = [
     "deps/*", 
-    "platforms/win32/*", 
-    "platforms/android/*"
+    "platforms/win32/cpp/include/*",
+    "platforms/win32/cpp/src/*"
 ]
+
+[tool.setuptools.exclude-package-data]
+weldbuild = []
 
 [project.urls]
 Source = "https://github.com/a3st/weldbuild"
